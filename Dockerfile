@@ -1,4 +1,4 @@
-FROM python:3.13-slim
+FROM python:3.12-slim
 RUN apt-get update && apt-get install -y \
     build-essential \
     python3-dev \
@@ -9,7 +9,6 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY . .
-# Upgrade pip to handle URL-based dependencies
 RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 EXPOSE 8000
