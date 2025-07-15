@@ -4,6 +4,7 @@ import pdfplumber
 import base64
 import spacy
 from io import BytesIO
+import re
 
 app = FastAPI()
 
@@ -18,20 +19,18 @@ class ExtractTextRequest(BaseModel):
 @app.post("/extract-text")
 async def extract_text(data: ExtractTextRequest):
     try:
-        # Access fields from Pydantic model
         pdf_base64 = data.pdf_base64
         job_skills = data.skills
 
-        # Decode the base64 PDF
+        # Validate PDF data
         if not pdf_base64:
             raise HTTPException(status_code=400, detail="No PDF base64 data provided")
 
+        # Decode base64 PDF
         pdf_data = base64.b64decode(pdf_base64)
-
-        # Wrap bytes in BytesIO for pdfplumber
         pdf_file = BytesIO(pdf_data)
 
-        # Extract text using pdfplumber
+        # Extract text from PDF
         text = ""
         with pdfplumber.open(pdf_file) as pdf:
             for page in pdf.pages:
@@ -42,20 +41,16 @@ async def extract_text(data: ExtractTextRequest):
         if not text:
             return {"text": "", "skills": []}
 
-        # Process text with spaCy
-        doc = nlp(text)
+        # Lowercase the whole text for case-insensitive matching
+        lower_text = text.lower()
 
-        # Extract skills by matching against job_skills
+        # Exact word boundary matching (case-insensitive)
         matched_skills = []
-        for token in doc:
-            # Check if the token is in the job skills
-            if token.text.lower() in [skill.lower() for skill in job_skills]:
-                if token.text not in matched_skills:
-                    matched_skills.append(token.text)
-            # Check for multi-token skills
-            for skill in job_skills:
-                if skill.lower() in text.lower() and skill not in matched_skills:
-                    matched_skills.append(skill)
+        for skill in job_skills:
+            # Build regex pattern with word boundaries
+            pattern = r"\b" + re.escape(skill.lower()) + r"\b"
+            if re.search(pattern, lower_text):
+                matched_skills.append(skill)
 
         return {"text": text, "skills": matched_skills}
 
