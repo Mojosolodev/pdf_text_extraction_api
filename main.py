@@ -3,6 +3,7 @@ from pydantic import BaseModel
 import pdfplumber
 import base64
 import spacy
+from io import BytesIO
 
 app = FastAPI()
 
@@ -27,11 +28,16 @@ async def extract_text(data: ExtractTextRequest):
 
         pdf_data = base64.b64decode(pdf_base64)
 
+        # Wrap bytes in BytesIO for pdfplumber
+        pdf_file = BytesIO(pdf_data)
+
         # Extract text using pdfplumber
         text = ""
-        with pdfplumber.open(pdf_data) as pdf:
+        with pdfplumber.open(pdf_file) as pdf:
             for page in pdf.pages:
-                text += page.extract_text() or ""
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
 
         if not text:
             return {"text": "", "skills": []}
@@ -42,7 +48,7 @@ async def extract_text(data: ExtractTextRequest):
         # Extract skills by matching against job_skills
         matched_skills = []
         for token in doc:
-            # Check if the token (or phrase) is in the job skills
+            # Check if the token is in the job skills
             if token.text.lower() in [skill.lower() for skill in job_skills]:
                 if token.text not in matched_skills:
                     matched_skills.append(token.text)
